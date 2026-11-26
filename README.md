@@ -19,9 +19,12 @@ mv patched squashfs-root/usr/bin/discord-phoenix
 squashfs-root/AppRun
 ```
 
-`patch` never overwrites its input, keeps every replacement the same length as
-the original, and writes nothing if the binary doesn't match the layout it
-knows. `check` lists whatever is still present in a binary:
+`patch` never overwrites its input and keeps every replacement the same length
+as the original. It looks for the shape of each endpoint (a Sentry DSN, the
+`vibeyard.tools`, `litix.io` and `amplitude.com` domains, the `/science` route),
+not for fixed positions or counts, so it is not tied to one build. It refuses to
+write anything if it finds no Sentry DSN or no `/science` route, since then it is
+not looking at a Phoenix binary. `check` lists whatever is still present:
 
 ```sh
 python3 patch_phoenix.py check squashfs-root/usr/bin/discord-phoenix
@@ -49,7 +52,11 @@ binary but were never observed sending anything.
   string.
 - `discord-desktop-crash-handler` is a separate binary with its own Sentry
   transport. It is not patched.
-- Checked against build `0.1.0-dev.20261123093910.gb71ec80` for Linux x86_64. A
-  different build will most likely be rejected until the patterns are updated.
+- Run against one build only, `0.1.0-dev.20261123093910.gb71ec80` for Linux
+  x86_64. The patterns are not specific to ELF or to that build, but other builds
+  and platforms are untested. A build that adds a new telemetry host needs a
+  line in `RULES`.
+- The crash reporter still starts ("crash reports on" in the log). It has no
+  reachable destination left.
 - Third-party loaders such as Sunbird run native code inside the process and can
   undo this.

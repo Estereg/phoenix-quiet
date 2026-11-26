@@ -8,7 +8,11 @@ import patch_phoenix
 
 KEY = b"0123456789abcdef" * 2
 DSN = b"https://" + KEY + b"@o12345.ingest.us.sentry.io/6789012345"
-CREDENTIAL = b'"credential":"k2026a:' + b"ab" * 20 + b':Zm9vYmFyLWJheg"'
+CREDENTIAL = (
+    b'"credential":"k2026a:'
+    + b"ab" * 20
+    + b':Zm9vYmFyLWJheg","endpoint":"https://x.example/v1/batch"'
+)
 HOSTS = b"".join(
     b"https://" + h + b".vibeyard.tools"
     for h in (
@@ -80,9 +84,23 @@ class PatchTests(unittest.TestCase):
         for needle in (KEY, b"sentry.io", b"vibeyard", b"litix", b"amplitude"):
             self.assertNotIn(needle, data)
 
-    def test_unknown_layout_writes_nothing(self):
+    def test_other_build_with_different_endpoints(self):
+        other = b"\0".join(
+            [
+                b"https://" + b"f" * 32 + b"@o1.ingest.eu.sentry.io/42",
+                b"https://reports.vibeyard.tools/v2/batch",
+                b"/science",
+            ]
+        )
         with open(self.src, "wb") as f:
-            f.write(BLOB.replace(b"img.litix.io", b"img.other.io"))
+            f.write(other)
+        self.assertEqual(run("patch", self.src, "-o", self.out), 0)
+        self.assertEqual(run("check", self.out), 0)
+        self.assertEqual(len(self.patched()), len(other))
+
+    def test_non_phoenix_binary_writes_nothing(self):
+        with open(self.src, "wb") as f:
+            f.write(BLOB.replace(KEY, b"z" * 32))
         self.assertEqual(run("patch", self.src, "-o", self.out), 1)
         self.assertFalse(os.path.exists(self.out))
 

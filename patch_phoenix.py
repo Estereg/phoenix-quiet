@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Neutralize the telemetry endpoints compiled into a Discord Phoenix binary.
 
-Strings are located by content and overwritten with same-length values, so the
-ELF layout does not change. The input file is never modified.
+Endpoints are found by the shape of the string, not by its position, and are
+overwritten with same-length values, so the binary layout does not change. The
+input file is never modified.
 
     patch_phoenix.py patch discord-phoenix -o discord-phoenix.patched
     patch_phoenix.py check discord-phoenix.patched
@@ -24,62 +25,56 @@ class Rule(NamedTuple):
     name: str
     pattern: re.Pattern[bytes]
     replace: Callable[[re.Match[bytes]], bytes]
-    expected: int
+    required: bool
 
 
-def unreachable_host(host: bytes) -> bytes:
+def unreachable(name: bytes) -> bytes:
     """Same-length name under .invalid, which never resolves."""
-    return b"x" * (len(host) - 8) + b".invalid"
+    return b"x" * (len(name) - 8) + b".invalid"
 
 
-def unreachable_dsn(m: re.Match[bytes]) -> bytes:
+def dsn(m: re.Match[bytes]) -> bytes:
     scheme, key, at, host, slash, project = m.groups()
     return (
-        scheme
-        + b"0" * len(key)
-        + at
-        + unreachable_host(host)
-        + slash
-        + b"0" * len(project)
+        scheme + b"0" * len(key) + at + unreachable(host) + slash + b"0" * len(project)
     )
 
 
-def blank_credential(m: re.Match[bytes]) -> bytes:
+def credential(m: re.Match[bytes]) -> bytes:
     head, secret, tail = m.groups()
     return head + b"x" * len(secret) + tail
 
 
-def rule(
-    name: str,
-    pattern: bytes,
-    replace: Callable[[re.Match[bytes]], bytes],
-    expected: int = 1,
-) -> Rule:
-    return Rule(name, re.compile(pattern), replace, expected)
+def domain(name: str, pattern: bytes) -> Rule:
+    return Rule(name, re.compile(pattern), lambda m: unreachable(m.group()), False)
 
 
+# Patched values must not match their own rule, so check and a second patch
+# can tell a patched binary from an untouched one.
+# Sentry and /science are on every build that reports at all, so a build
+# without them is not one this tool understands. The rest vary between builds.
 RULES = [
-    rule(
+    Rule(
         "sentry dsn",
-        rb"(https://)([0-9a-f]{32})(@)(o\d+\.ingest\.[a-z.]*sentry\.io)(/)(\d+)",
-        unreachable_dsn,
+        re.compile(rb"(https://)(?!0{32}@)([0-9a-f]{32})(@)([a-z0-9.-]+)(/)(\d+)"),
+        dsn,
+        True,
     ),
-    rule(
+    Rule(
+        "/science route",
+        re.compile(rb"(?<!routes)/science"),
+        lambda m: b"/xxxxxxx",
+        True,
+    ),
+    Rule(
         "errmon credential",
-        rb'("credential":")(k\d+[a-z]:[0-9a-f]{40}:[A-Za-z0-9_-]+)(")',
-        blank_credential,
+        re.compile(rb'("credential":")(?!x+")([^"]+)(",\s*"endpoint":")'),
+        credential,
+        False,
     ),
-    rule(
-        "phoenix hosts",
-        rb"(?:phoenix-errmon|phoenix-external-reports|project-phoenix)\.vibeyard\.tools",
-        lambda m: unreachable_host(m.group()),
-        expected=4,
-    ),
-    rule("/science route", rb"(?<!routes)/science", lambda m: b"/xxxxxxx"),
-    rule("mux beacon", rb"img\.litix\.io", lambda m: unreachable_host(m.group())),
-    rule(
-        "amplitude", rb"api\.lab\.amplitude\.com", lambda m: unreachable_host(m.group())
-    ),
+    domain("vibeyard.tools", rb"vibeyard\.tools"),
+    domain("litix.io", rb"litix\.io"),
+    domain("amplitude.com", rb"amplitude\.com"),
 ]
 
 
@@ -111,14 +106,14 @@ def cmd_patch(args: argparse.Namespace) -> int:
     data = read(args.binary)
     print(f"input   {hashlib.sha256(data).hexdigest()}")
     counts = patch(data)
-    mismatched = [(r, n) for r, n in counts if n != r.expected]
+    missing = [r.name for r, n in counts if r.required and n == 0]
     for r, n in counts:
+        status = "MISSING" if r.required and n == 0 else "ok" if n else "none"
+        print(f"{status:8} {r.name}: {n}")
+    if missing:
         print(
-            f"{'ok ' if n == r.expected else 'MISMATCH'} {r.name}: {n} (expected {r.expected})"
-        )
-    if mismatched:
-        print(
-            "error: this build does not match the known layout; nothing written",
+            f"error: not found: {', '.join(missing)}. This does not look like a "
+            "Phoenix build; nothing written",
             file=sys.stderr,
         )
         return 1
@@ -134,7 +129,7 @@ def cmd_patch(args: argparse.Namespace) -> int:
 def cmd_check(args: argparse.Namespace) -> int:
     found = count_leftovers(read(args.binary))
     for r, n in found:
-        print(f"{'FOUND' if n else 'clean'} {r.name}: {n}")
+        print(f"{'FOUND' if n else 'clean':8} {r.name}: {n}")
     return 1 if any(n for _, n in found) else 0
 
 
