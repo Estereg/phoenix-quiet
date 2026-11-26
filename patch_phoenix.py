@@ -51,19 +51,13 @@ def domain(name: str, pattern: bytes) -> Rule:
 
 # Patched values must not match their own rule, so check and a second patch
 # can tell a patched binary from an untouched one.
-# Sentry and /science are on every build that reports at all, so a build
-# without them is not one this tool understands. The rest vary between builds.
+# A Sentry DSN is on every build that reports at all, so a build without one is
+# not one this tool understands. The rest vary between builds.
 RULES = [
     Rule(
         "sentry dsn",
         re.compile(rb"(https://)(?!0{32}@)([0-9a-f]{32})(@)([a-z0-9.-]+)(/)(\d+)"),
         dsn,
-        True,
-    ),
-    Rule(
-        "/science route",
-        re.compile(rb"(?<!routes)/science"),
-        lambda m: b"/xxxxxxx",
         True,
     ),
     Rule(

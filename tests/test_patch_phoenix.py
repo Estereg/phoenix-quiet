@@ -29,7 +29,7 @@ BLOB = b"\x7fELF\0\0" + b"\0".join(
         CREDENTIAL,
         HOSTS,
         SOURCE_PATH,
-        b"drive/science",
+        b"/api/v9/science",
         b"img.litix.io",
         b"https://api.lab.amplitude.com",
         b"https://datadog.discord.tools/apm/traces?",
@@ -76,7 +76,7 @@ class PatchTests(unittest.TestCase):
         data = self.patched()
         self.assertIn(SOURCE_PATH, data)
         self.assertIn(b"discord.com/api/v9", data)
-        self.assertNotIn(b"drive/science", data)
+        self.assertIn(b"/api/v9/science", data)
 
     def test_replacements_never_resolve(self):
         run("patch", self.src, "-o", self.out)
@@ -97,7 +97,6 @@ class PatchTests(unittest.TestCase):
             [
                 b"https://" + b"f" * 32 + b"@o1.ingest.eu.sentry.io/42",
                 b"https://reports.vibeyard.tools/v2/batch",
-                b"/science",
             ]
         )
         with open(self.src, "wb") as f:

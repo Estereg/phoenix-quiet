@@ -21,10 +21,10 @@ squashfs-root/AppRun
 
 `patch` never overwrites its input and keeps every replacement the same length
 as the original. It looks for the shape of each endpoint (a Sentry DSN, the
-`vibeyard.tools`, `litix.io` and `amplitude.com` domains, the `/science` route),
+`vibeyard.tools`, `litix.io`, `amplitude.com` and `datadog.discord.tools` domains),
 not for fixed positions or counts, so it is not tied to one build. It refuses to
-write anything if it finds no Sentry DSN or no `/science` route, since then it is
-not looking at a Phoenix binary. `check` lists whatever is still present:
+write anything if it finds no Sentry DSN, since then it is not looking at a
+Phoenix binary. `check` lists whatever is still present:
 
 ```sh
 python3 patch_phoenix.py check squashfs-root/usr/bin/discord-phoenix
@@ -37,17 +37,20 @@ Tests: `python3 -m unittest discover -s tests`.
 | Channel | What it sent |
 |---|---|
 | Sentry (`*.ingest.us.sentry.io`) | One event per launch with account id, email, username, a `staff` flag, OS and distro |
-| `/api/v9/science` | The usual analytics events (sessions, views, timings) |
 | errmon (`phoenix-errmon.vibeyard.tools`) | Hang and performance reports, with a credential embedded in the binary |
 | Phoenix reports and updater (`vibeyard.tools`) | Bug reports and builds; both need an employee or tester sign-in |
 | Mux and Amplitude | Video and checkout analytics |
 | Datadog (`datadog.discord.tools`) | APM trace upload endpoint |
 
-Sentry and `/science` were seen in captured traffic. The rest are present in the
-binary but were never observed sending anything.
+Sentry was seen in captured traffic. The rest are present in the binary but were
+never observed sending anything.
 
 ## Limits
 
+- The `/api/v9/science` analytics events are not blocked. The client posts them to
+  Discord's own API, the same host it needs for everything else, so they can't
+  be cut by name: rewriting the route only turns them into 404s that are easy to
+  spot and still carry the data. Stopping them takes a code patch.
 - Discord still sees your account, and the client still identifies itself.
   Gateway and API requests carry `design_id: 4` and `native_build_number`, which
   mark it as Phoenix, plus OS, distro, locale and an installation id. These are
@@ -62,4 +65,5 @@ binary but were never observed sending anything.
 - The crash reporter still starts ("crash reports on" in the log). It has no
   reachable destination left.
 - Third-party loaders such as Sunbird run native code inside the process and can
-  undo this.
+  undo this. Some builds also need such a loader to pass Phoenix's own access
+  check, so a patched binary launched without it may be refused.
