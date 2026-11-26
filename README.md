@@ -47,9 +47,10 @@ binary but were never observed sending anything.
 
 ## Limits
 
-- Discord still sees your account. The gateway and API requests carry
-  `design_id: 4`, which marks the client as Phoenix, and it is not a patchable
-  string.
+- Discord still sees your account, and the client still identifies itself.
+  Gateway and API requests carry `design_id: 4` and `native_build_number`, which
+  mark it as Phoenix, plus OS, distro, locale and an installation id. These are
+  compiled-in values, not endpoints, and this tool does not touch them.
 - `discord-desktop-crash-handler` is a separate binary with its own Sentry
   transport. It is not patched.
 - Run against one build only, `0.1.0-dev.20261123093910.gb71ec80` for Linux
