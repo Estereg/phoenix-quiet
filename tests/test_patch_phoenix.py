@@ -32,6 +32,7 @@ BLOB = b"\x7fELF\0\0" + b"\0".join(
         b"drive/science",
         b"img.litix.io",
         b"https://api.lab.amplitude.com",
+        b"https://datadog.discord.tools/apm/traces?",
         b"discord.com/api/v9",
     ]
 )
@@ -81,7 +82,14 @@ class PatchTests(unittest.TestCase):
         run("patch", self.src, "-o", self.out)
         data = self.patched()
         self.assertIn(b".invalid", data)
-        for needle in (KEY, b"sentry.io", b"vibeyard", b"litix", b"amplitude"):
+        for needle in (
+            KEY,
+            b"sentry.io",
+            b"vibeyard",
+            b"litix",
+            b"amplitude",
+            b"datadog",
+        ):
             self.assertNotIn(needle, data)
 
     def test_other_build_with_different_endpoints(self):

@@ -75,6 +75,7 @@ RULES = [
     domain("vibeyard.tools", rb"vibeyard\.tools"),
     domain("litix.io", rb"litix\.io"),
     domain("amplitude.com", rb"amplitude\.com"),
+    domain("datadog.discord.tools", rb"datadog\.discord\.tools"),
 ]
 
 

@@ -41,6 +41,7 @@ Tests: `python3 -m unittest discover -s tests`.
 | errmon (`phoenix-errmon.vibeyard.tools`) | Hang and performance reports, with a credential embedded in the binary |
 | Phoenix reports and updater (`vibeyard.tools`) | Bug reports and builds; both need an employee or tester sign-in |
 | Mux and Amplitude | Video and checkout analytics |
+| Datadog (`datadog.discord.tools`) | APM trace upload endpoint |
 
 Sentry and `/science` were seen in captured traffic. The rest are present in the
 binary but were never observed sending anything.
@@ -51,8 +52,9 @@ binary but were never observed sending anything.
   Gateway and API requests carry `design_id: 4` and `native_build_number`, which
   mark it as Phoenix, plus OS, distro, locale and an installation id. These are
   compiled-in values, not endpoints, and this tool does not touch them.
-- `discord-desktop-crash-handler` is a separate binary with its own Sentry
-  transport. It is not patched.
+- The crash handler is a separate process, but it receives its Sentry DSN from
+  the main binary at launch, so it inherits the neutralized one. A forced crash
+  on a patched build sent nothing; the report stays in a local queue.
 - Run against one build only, `0.1.0-dev.20261123093910.gb71ec80` for Linux
   x86_64. The patterns are not specific to ELF or to that build, but other builds
   and platforms are untested. A build that adds a new telemetry host needs a
